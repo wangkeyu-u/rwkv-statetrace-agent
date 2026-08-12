@@ -76,6 +76,55 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _write_integrity_manifest(directory: Path) -> None:
+    """Hash every durable checkpoint artifact except the manifest itself."""
+
+    entries = []
+    for path in sorted(directory.iterdir(), key=lambda item: item.name):
+        if path.name == "integrity.sha256":
+            continue
+        if path.is_symlink() or not path.is_file():
+            raise CheckpointError(f"Unexpected checkpoint artifact: {path.name}")
+        entries.append(f"{_sha256(path)}  {path.name}")
+    (directory / "integrity.sha256").write_text("\n".join(entries) + "\n", encoding="ascii")
+
+
+def _verify_integrity_manifest(directory: Path) -> None:
+    manifest = directory / "integrity.sha256"
+    if not manifest.is_file() or manifest.is_symlink():
+        raise CheckpointCorrupted("Checkpoint integrity manifest is missing or invalid")
+    expected: dict[str, str] = {}
+    try:
+        for line in manifest.read_text(encoding="ascii").splitlines():
+            checksum, separator, name = line.partition("  ")
+            if (
+                not separator
+                or not re.fullmatch(r"[0-9a-f]{64}", checksum)
+                or not name
+                or Path(name).name != name
+                or name == manifest.name
+                or name in expected
+            ):
+                raise ValueError("malformed integrity entry")
+            expected[name] = checksum
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise CheckpointCorrupted("Checkpoint integrity manifest is malformed") from exc
+    try:
+        actual_names = {
+            path.name for path in directory.iterdir() if path.name != manifest.name
+        }
+        if actual_names != set(expected):
+            raise CheckpointCorrupted("Checkpoint artifact set does not match integrity manifest")
+        for name, checksum in expected.items():
+            path = directory / name
+            if path.is_symlink() or not path.is_file() or _sha256(path) != checksum:
+                raise CheckpointCorrupted(f"Checkpoint artifact checksum mismatch: {name}")
+    except CheckpointCorrupted:
+        raise
+    except OSError as exc:
+        raise CheckpointCorrupted("Checkpoint artifacts could not be read safely") from exc
+
+
 def _validate_id(value: str, label: str) -> str:
     if not _SAFE_ID.fullmatch(value):
         raise ValueError(f"{label} contains unsafe characters: {value!r}")
@@ -166,6 +215,8 @@ class CheckpointManager:
                 if source.exists():
                     shutil.copy2(source, temp / "trace.jsonl")
 
+            _write_integrity_manifest(temp)
+
             if destination.exists():
                 if not overwrite:
                     raise FileExistsError(destination)
@@ -209,6 +260,7 @@ class CheckpointManager:
         path = self.checkpoint_path(task_id, selected_step)
         if not path.is_dir():
             raise CheckpointNotFound(f"Checkpoint does not exist: {path}")
+        _verify_integrity_manifest(path)
         try:
             task_state = json.loads((path / "task_state.json").read_text(encoding="utf-8"))
             raw_meta = json.loads((path / "model_state.meta.json").read_text(encoding="utf-8"))
@@ -219,6 +271,10 @@ class CheckpointManager:
             raise CheckpointCorrupted(
                 f"Unsupported checkpoint format {raw_meta.get('format_version')!r}"
             )
+        if raw_meta.get("task_id") != task_id or raw_meta.get("step") != selected_step:
+            raise CheckpointCorrupted("Checkpoint metadata identity does not match its storage path")
+        if task_state.get("task_id") != task_id or task_state.get("step") != selected_step:
+            raise CheckpointCorrupted("Task state identity does not match its storage path")
         expected_backend = str(getattr(backend, "name", "none"))
         expected_model = str(getattr(backend, "model_name", "none"))
         if raw_meta.get("backend") != expected_backend:
@@ -241,6 +297,8 @@ class CheckpointManager:
                 raise CheckpointCorrupted(
                     f"Model state checksum mismatch: expected {expected_hash}, got {actual_hash}"
                 )
+            if raw_meta.get("state_size_bytes") != state_file.stat().st_size:
+                raise CheckpointCorrupted("Model state size does not match checkpoint metadata")
             try:
                 model_state = backend.load_state(state_file)
             except Exception as exc:
@@ -279,6 +337,8 @@ class CheckpointManager:
         source = self.checkpoint_path(source_task_id, selected_step)
         if not source.is_dir():
             raise CheckpointNotFound(f"Checkpoint does not exist: {source}")
+        # Never let a fork re-hash and thereby legitimize a damaged source.
+        _verify_integrity_manifest(source)
         destination = self.checkpoint_path(new_task_id, selected_step)
         if destination.exists():
             raise FileExistsError(destination)
@@ -304,6 +364,7 @@ class CheckpointManager:
                 json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
                 encoding="utf-8",
             )
+            _write_integrity_manifest(temp)
             os.replace(temp, destination)
         except Exception:
             shutil.rmtree(temp, ignore_errors=True)

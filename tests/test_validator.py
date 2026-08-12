@@ -28,6 +28,11 @@ class ValidatorTests(unittest.TestCase):
                 "tool": "run_tests",
                 "arguments": {"command": "pytest -q"},
                 "status": "success",
+                "data": {
+                    "exit_code": 1,
+                    "stdout": "================ 1 failed, 7 passed in 0.12s ================",
+                    "stderr": "",
+                },
             },
         }
 
@@ -45,7 +50,7 @@ class ValidatorTests(unittest.TestCase):
                     "evidence_ids": ["obs-1"],
                 }
             ],
-            "verification": {"tests_run": ["pytest -q"], "result": "1 failed"},
+            "verification": {"tests_run": ["pytest -q"], "result": "1 failed, 7 passed"},
             "recommendations": ["Return 42."],
         }
 
@@ -58,7 +63,7 @@ class ValidatorTests(unittest.TestCase):
         report = FinalReport(
             summary="Wrong value.",
             findings=(Finding("src/bug.py", 2, "Returns 41.", ("obs-1",)),),
-            verification={"tests_run": ["pytest -q"], "result": "failed"},
+            verification={"tests_run": ["pytest -q"], "result": "tests failed"},
             recommendations=("Return 42.",),
         )
         self.assertTrue(self.validator.validate(report, self.evidence).passed)
@@ -94,9 +99,35 @@ class ValidatorTests(unittest.TestCase):
         codes = {error.code for error in self.validator.validate(report, self.evidence).errors}
         self.assertIn("UNVERIFIED_TEST_COMMAND", codes)
 
+    def test_rejects_test_counts_that_contradict_captured_output(self):
+        report = self.valid_report()
+        report["verification"]["result"] = "8 passed"
+        codes = {error.code for error in self.validator.validate(report, self.evidence).errors}
+        self.assertIn("TEST_RESULT_MISMATCH", codes)
+
+    def test_rejects_success_claim_when_test_exit_code_failed(self):
+        report = self.valid_report()
+        report["verification"]["result"] = "All tests passed successfully"
+        codes = {error.code for error in self.validator.validate(report, self.evidence).errors}
+        self.assertIn("TEST_RESULT_MISMATCH", codes)
+
+    def test_ignores_failed_tool_attempt_as_test_evidence(self):
+        report = self.valid_report()
+        self.evidence["obs-2"]["status"] = "error"
+        codes = {error.code for error in self.validator.validate(report, self.evidence).errors}
+        self.assertIn("UNVERIFIED_TEST_RESULT", codes)
+
     def test_evidence_from_real_agent_steps(self):
         read_observation = Observation(status="success", evidence_id="obs-1")
-        test_observation = Observation(status="success", evidence_id="obs-2")
+        test_observation = Observation(
+            status="success",
+            evidence_id="obs-2",
+            data={
+                "exit_code": 1,
+                "stdout": "1 failed, 7 passed in 0.12s",
+                "stderr": "",
+            },
+        )
         steps = [
             AgentStep(1, ToolCall("read_file", {"path": "src/bug.py"}), read_observation),
             AgentStep(2, ToolCall("run_tests", {"command": "pytest -q"}), test_observation),

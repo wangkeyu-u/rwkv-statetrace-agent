@@ -37,6 +37,14 @@ class ProtocolTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             parse_action('{"type":"tool_call","tool":"finish_report","arguments":{}}')
 
+    def test_rejects_multiple_actions_but_allows_prose_wrapper(self):
+        one = '{"type":"tool_call","tool":"list_files","arguments":{"path":"."}}'
+        action = parse_action(f"Here is the action:\n{one}\nDone.")
+        self.assertIsInstance(action, ToolCall)
+        with self.assertRaises(ProtocolError) as caught:
+            parse_action(f"{one}\n{one}")
+        self.assertEqual(caught.exception.code, ErrorCode.INVALID_MODEL_OUTPUT)
+
 
 if __name__ == "__main__":
     unittest.main()

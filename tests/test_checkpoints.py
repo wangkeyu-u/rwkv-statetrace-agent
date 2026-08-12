@@ -73,6 +73,61 @@ class CheckpointManagerTests(unittest.TestCase):
         with self.assertRaises(CheckpointCorrupted):
             self.manager.load(task_id="task-corrupt", backend=self.backend)
 
+    def test_tampered_task_state_and_trace_fail_integrity(self):
+        trace = self.root / "trace.jsonl"
+        trace.write_text('{"event":"original"}\n', encoding="utf-8")
+        metadata = self.manager.save(
+            task_id="task-artifacts",
+            step=1,
+            task_state={"goal": "original"},
+            model_state={"cursor": 1},
+            backend=self.backend,
+            trace_path=trace,
+        )
+        (metadata.path / "task_state.json").write_text('{"goal":"forged"}\n', encoding="utf-8")
+        with self.assertRaises(CheckpointCorrupted):
+            self.manager.load(task_id="task-artifacts", backend=self.backend)
+
+        # Restore by saving atomically, then prove the trace is covered too.
+        metadata = self.manager.save(
+            task_id="task-artifacts",
+            step=1,
+            task_state={"goal": "original"},
+            model_state={"cursor": 1},
+            backend=self.backend,
+            trace_path=trace,
+        )
+        (metadata.path / "trace.jsonl").write_text('{"event":"forged"}\n', encoding="utf-8")
+        with self.assertRaises(CheckpointCorrupted):
+            self.manager.load(task_id="task-artifacts", backend=self.backend)
+
+    def test_unexpected_checkpoint_artifact_fails_integrity(self):
+        metadata = self.manager.save(
+            task_id="task-extra",
+            step=1,
+            task_state={},
+            model_state={"cursor": 1},
+            backend=self.backend,
+        )
+        (metadata.path / "injected.txt").write_text("unexpected", encoding="utf-8")
+        with self.assertRaises(CheckpointCorrupted):
+            self.manager.load(task_id="task-extra", backend=self.backend)
+
+    def test_clone_refuses_to_bless_a_corrupted_source(self):
+        metadata = self.manager.save(
+            task_id="damaged-source",
+            step=3,
+            task_state={"goal": "original"},
+            model_state={"cursor": 3},
+            backend=self.backend,
+        )
+        (metadata.path / "task_state.json").write_text('{"goal":"forged"}\n', encoding="utf-8")
+        with self.assertRaises(CheckpointCorrupted):
+            self.manager.clone_checkpoint(
+                source_task_id="damaged-source", new_task_id="unsafe-branch", step=3
+            )
+        self.assertFalse((self.manager.root / "unsafe-branch").exists())
+
     def test_backend_or_model_mismatch_fails_closed(self):
         self.manager.save(
             task_id="task-mismatch",
@@ -97,16 +152,18 @@ class CheckpointManagerTests(unittest.TestCase):
         clone_path = self.manager.clone_checkpoint(
             source_task_id="source", new_task_id="branch", step=4
         )
+        branch = self.manager.load(task_id="branch", step=4, backend=self.backend)
         clone_task = json.loads((clone_path / "task_state.json").read_text(encoding="utf-8"))
         clone_task["history"].append("branch-only")
         (clone_path / "task_state.json").write_text(json.dumps(clone_task), encoding="utf-8")
 
         original = self.manager.load(task_id="source", step=4, backend=self.backend)
-        branch = self.manager.load(task_id="branch", step=4, backend=self.backend)
         self.assertEqual(original.task_state["history"], ["one"])
         self.assertEqual(branch.task_state["task_id"], "branch")
         self.assertEqual(branch.task_state["forked_from"]["task_id"], "source")
         self.assertEqual(branch.model_state, original.model_state)
+        with self.assertRaises(CheckpointCorrupted):
+            self.manager.load(task_id="branch", step=4, backend=self.backend)
 
     def test_task_only_checkpoint_and_missing_task(self):
         no_state_backend = type(

@@ -61,7 +61,13 @@ source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ```
 
-The bundled `demo` copies a packaged teaching fixture into `.statetrace/demo-workspace`, so it works from an editable checkout. A wheel installation needs the `demo` extra (`pip install 'rwkv-statetrace-agent[demo]'`) because the teaching run invokes pytest. The top-level `examples/` copy remains available for inspection.
+For a wheel/package installation, include the Demo dependency:
+
+```bash
+python -m pip install 'rwkv-statetrace-agent[demo]'
+```
+
+The bundled `demo` copies a packaged teaching fixture into a new directory under `.statetrace/demo-workspaces/`, so repeated runs do not overwrite an earlier task's workspace. The `demo` extra installs pytest because the teaching run invokes it. The top-level `examples/` copy remains available for inspection in a source checkout.
 
 Run the deterministic demonstration:
 
@@ -69,7 +75,7 @@ Run the deterministic demonstration:
 statetrace demo
 ```
 
-The demo operates only on the copied teaching fixture under `.statetrace/demo-workspace`. Its inspectable source copy is `examples/fixture_repo`. The fixture contains an intentional month-boundary defect, so its own test suite should finish with `1 passed, 3 failed`. The Agent diagnoses it; it does not modify it.
+The demo operates only on its copied teaching fixture under `.statetrace/demo-workspaces/`. Its inspectable source copy is `examples/fixture_repo`. The fixture contains an intentional month-boundary defect, so its own test suite should finish with `1 passed, 3 failed`. The Agent diagnoses it; it does not modify it. If pytest is absent, the CLI stops before creating a misleading “completed” diagnosis and prints the exact installation command.
 
 Inspect generated task artifacts under `.statetrace/` and export a report if needed:
 
@@ -156,7 +162,7 @@ Every executed tool result receives an ID such as `obs-003`. Final findings must
   "file": "src/calendar_edge/dates.py",
   "line": 20,
   "claim": "The month-end branch preserves the original month and year.",
-  "evidence_ids": ["obs-003", "obs-004"]
+  "evidence_ids": ["obs-003"]
 }
 ```
 
@@ -172,10 +178,11 @@ After completed steps, the checkpoint manager stores exact task metadata and, wh
 ├── model_state.bin          # only when a supported state exists
 ├── model_state.meta.json
 ├── checksum.sha256          # only with model_state.bin
+├── integrity.sha256         # hashes every durable checkpoint artifact
 └── trace.jsonl
 ```
 
-Resume and fork operations verify format, backend, model name and checksum before loading state:
+Resume and fork operations verify the complete artifact manifest, format, task identity, backend, model name, state size and checksum before loading state:
 
 ```bash
 statetrace resume --task-id <task-id>

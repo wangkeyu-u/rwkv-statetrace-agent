@@ -147,6 +147,28 @@ class ControllerTests(unittest.TestCase):
         result = controller.run(controller.new_task("dedupe", self.root, "task-repeat"))
         self.assertEqual(result.steps[1].observation.error_code, ErrorCode.DUPLICATE_TOOL_CALL)
 
+    def test_duplicate_tracking_is_task_scoped_when_controller_is_reused(self):
+        call = {
+            "type": "tool_call",
+            "tool": "read_file",
+            "arguments": {"path": "app.py", "start_line": 1, "end_line": 1},
+        }
+        backend = ReplayBackend([call, final_action(), call, final_action()])
+        controller = AgentController(
+            backend=backend,
+            tools=default_registry(),
+            config=ControllerConfig(max_steps=2, max_duplicate_calls=1),
+        )
+        first = controller.run(controller.new_task("first", self.root, "task-first"))
+        # Replay state is task-local; advance the second task's cursor to its
+        # own recorded sequence while keeping an otherwise fresh task history.
+        second = controller.new_task("second", self.root, "task-second")
+        second.model_state = {"cursor": 2}
+        second = controller.run(second)
+        self.assertEqual(first.status, AgentStatus.COMPLETED)
+        self.assertEqual(second.status, AgentStatus.COMPLETED)
+        self.assertIsNone(second.steps[0].observation.error_code)
+
     def test_checkpoint_restores_history_and_resumes_without_repeating_tools(self):
         call = {
             "type": "tool_call",

@@ -12,6 +12,27 @@ from ..models import ErrorCode, JSONValue, Observation
 from .base import Tool, ToolContext, ToolError, optional_int, require_string, truncate
 
 FORBIDDEN_TOKENS = {";", "&&", "||", "|", ">", ">>", "<", "2>", "&"}
+PYTEST_FLAG_OPTIONS = {
+    "-q",
+    "--quiet",
+    "-v",
+    "--verbose",
+    "-x",
+    "--exitfirst",
+    "--lf",
+    "--last-failed",
+    "--ff",
+    "--failed-first",
+    "--nf",
+    "--new-first",
+    "--disable-warnings",
+    "--strict-markers",
+    "--strict-config",
+    "-s",
+}
+PYTEST_VALUE_OPTIONS = {"-k", "-m", "--tb", "--maxfail", "--color"}
+PYTEST_TB_VALUES = {"auto", "long", "short", "line", "native", "no"}
+PYTEST_COLOR_VALUES = {"yes", "no", "auto"}
 
 
 class RunTestsTool(Tool):
@@ -107,31 +128,55 @@ class RunTestsTool(Tool):
                 )
             return
         offset = 3 if argv[0] in {"python", "python3"} else 1
-        dangerous_options = (
-            "--rootdir",
-            "--confcutdir",
-            "--basetemp",
-            "--override-ini",
-            "--import-mode",
-        )
         args = argv[offset:]
-        for index, item in enumerate(args):
-            if item == "-c" or item == "-p" or item.startswith(dangerous_options):
-                raise ToolError(
-                    ErrorCode.COMMAND_NOT_ALLOWED,
-                    f"pytest option {item!r} is not allowed by the bounded runner.",
-                )
-            if item.startswith("-"):
+        index = 0
+        positional_only = False
+        while index < len(args):
+            item = args[index]
+            if item == "--":
+                positional_only = True
+                index += 1
                 continue
-            # Values following selection/output flags are not filesystem paths.
-            if index and args[index - 1] in {"-k", "-m", "--tb", "--maxfail"}:
+            if not positional_only and item in PYTEST_FLAG_OPTIONS:
+                index += 1
                 continue
-            supplied = Path(item.split("::", 1)[0])
-            if supplied.is_absolute() or ".." in supplied.parts:
-                try:
-                    context.resolve_path(str(supplied), must_exist=False)
-                except ToolError as exc:
+            if not positional_only and item.startswith("-"):
+                option, separator, inline_value = item.partition("=")
+                if option not in PYTEST_VALUE_OPTIONS:
                     raise ToolError(
                         ErrorCode.COMMAND_NOT_ALLOWED,
-                        "Test targets must stay inside the task workspace.",
-                    ) from exc
+                        f"pytest option {item!r} is not in the bounded runner allow-list.",
+                    )
+                if separator:
+                    value = inline_value
+                else:
+                    index += 1
+                    if index >= len(args):
+                        raise ToolError(
+                            ErrorCode.INVALID_ARGUMENTS,
+                            f"pytest option {option!r} requires a value.",
+                        )
+                    value = args[index]
+                RunTestsTool._validate_option_value(option, value)
+                index += 1
+                continue
+            supplied = Path(item.split("::", 1)[0])
+            try:
+                context.resolve_path(str(supplied), must_exist=False)
+            except ToolError as exc:
+                raise ToolError(
+                    ErrorCode.COMMAND_NOT_ALLOWED,
+                    "Test targets must stay inside the task workspace.",
+                ) from exc
+            index += 1
+
+    @staticmethod
+    def _validate_option_value(option: str, value: str) -> None:
+        if not value:
+            raise ToolError(ErrorCode.INVALID_ARGUMENTS, f"pytest option {option!r} requires a value.")
+        if option == "--tb" and value not in PYTEST_TB_VALUES:
+            raise ToolError(ErrorCode.INVALID_ARGUMENTS, f"Unsupported --tb value: {value!r}.")
+        if option == "--color" and value not in PYTEST_COLOR_VALUES:
+            raise ToolError(ErrorCode.INVALID_ARGUMENTS, f"Unsupported --color value: {value!r}.")
+        if option == "--maxfail" and (not value.isdigit() or int(value) < 1):
+            raise ToolError(ErrorCode.INVALID_ARGUMENTS, "--maxfail must be a positive integer.")

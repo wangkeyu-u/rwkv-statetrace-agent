@@ -50,10 +50,26 @@ class ToolTests(unittest.TestCase):
             "`whoami`",
             "pytest ../../outside.py",
             "pytest --rootdir=/tmp",
+            "pytest --junitxml=/tmp/results.xml",
+            "pytest --cov-config=/tmp/coveragerc",
+            "pytest --html=/tmp/report.html",
+            "pytest -p no:cacheprovider",
             "npm test -- --runInBand",
         ):
             result = self.registry.execute("run_tests", {"command": command}, self.context)
             self.assertEqual(result.error_code, ErrorCode.COMMAND_NOT_ALLOWED, command)
+
+    def test_bounded_pytest_selection_and_output_options_are_allowed(self):
+        # Validate without executing pytest: the strict allow-list must retain
+        # common selection and terminal-output flags.
+        from statetrace.tools.tests import RunTestsTool
+
+        for argv in (
+            ["pytest", "-q", "-k", "date boundary", "--maxfail=2", "tests/test_dates.py"],
+            ["python", "-m", "pytest", "-m", "not slow", "--tb", "short"],
+            ["pytest", "--color=auto", "--disable-warnings", "src/test_app.py::test_value"],
+        ):
+            RunTestsTool._validate_arguments(argv, self.context)
 
     def test_calculator_never_evaluates_python(self):
         good = self.registry.execute("calculator", {"expression": "2 * (4 + 1)"}, self.context)

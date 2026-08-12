@@ -45,11 +45,24 @@ def _extract_object(text: str) -> dict[str, Any]:
         if character != "{":
             continue
         try:
-            value, _ = decoder.raw_decode(cleaned[position:])
+            value, end = decoder.raw_decode(cleaned[position:])
         except JSONDecodeError:
             failures += 1
             continue
         if isinstance(value, dict):
+            suffix = cleaned[position + end :]
+            for next_position, next_character in enumerate(suffix):
+                if next_character != "{":
+                    continue
+                try:
+                    extra, _ = decoder.raw_decode(suffix[next_position:])
+                except JSONDecodeError:
+                    continue
+                if isinstance(extra, dict):
+                    raise ProtocolError(
+                        ErrorCode.INVALID_MODEL_OUTPUT,
+                        "Output contains multiple JSON objects; return exactly one action.",
+                    )
             return value
     code = ErrorCode.INVALID_JSON if failures else ErrorCode.INVALID_MODEL_OUTPUT
     raise ProtocolError(code, "Output must contain one valid JSON object.")

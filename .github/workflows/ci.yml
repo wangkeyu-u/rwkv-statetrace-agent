@@ -15,9 +15,9 @@ jobs:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -42,6 +42,16 @@ jobs:
       - name: Unit and integration tests
         run: python -m pytest -q tests
 
+      - name: Run the packaged Replay demo from an isolated state directory
+        shell: bash
+        run: |
+          demo_state=$(mktemp -d)
+          demo_output=$(STATETRACE_HOME="$demo_state" statetrace demo)
+          echo "$demo_output"
+          python -c 'import json,sys; result=json.load(sys.stdin); assert result["status"] == "COMPLETED"; assert result["mode"] == "replay"' <<< "$demo_output"
+          report_path=$(python -c 'import json,sys; print(json.load(sys.stdin)["report"])' <<< "$demo_output")
+          test -s "$report_path"
+
       - name: Confirm the teaching fixture still exposes its intentional bug
         shell: bash
         run: |
@@ -61,3 +71,15 @@ jobs:
 
       - name: Build source and wheel distributions
         run: python -m build
+
+      - name: Smoke-test the built wheel outside the checkout
+        shell: bash
+        run: |
+          wheel_path=$(find dist -name '*.whl' -print -quit)
+          wheel_env=$(mktemp -d)
+          wheel_state=$(mktemp -d)
+          python -m venv "$wheel_env/venv"
+          "$wheel_env/venv/bin/python" -m pip install "${wheel_path}[demo]"
+          demo_output=$(cd "$wheel_env" && STATETRACE_HOME="$wheel_state" "$wheel_env/venv/bin/statetrace" demo)
+          echo "$demo_output"
+          python -c 'import json,sys; result=json.load(sys.stdin); assert result["status"] == "COMPLETED"; assert result["mode"] == "replay"' <<< "$demo_output"

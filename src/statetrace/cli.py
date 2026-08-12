@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
-import importlib.resources
 import json
 import os
+import re
 import shutil
 import sys
+import tempfile
+from importlib import resources, util
 from pathlib import Path
 from typing import Any
 
@@ -22,9 +24,30 @@ from .tools.registry import default_registry
 from .trace import TraceWriter
 from .validator import ReportValidator
 
+_SAFE_TASK_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+
 
 def _state_root() -> Path:
-    return Path(os.getenv("STATETRACE_HOME", ".statetrace")).resolve()
+    configured = os.getenv("STATETRACE_HOME", "").strip()
+    return Path(configured or ".statetrace").expanduser().resolve()
+
+
+def _task_id(value: str) -> str:
+    if not _SAFE_TASK_ID.fullmatch(value):
+        raise argparse.ArgumentTypeError(
+            "task ID must start with a letter or digit and contain at most 128 "
+            "letters, digits, dots, underscores, or hyphens"
+        )
+    return value
+
+
+def _require_demo_dependencies() -> None:
+    if util.find_spec("pytest") is None:
+        raise RuntimeError(
+            "The Replay demo executes pytest, but pytest is not installed. "
+            "Install with `pip install -e '.[dev]'` from a clone or "
+            "`pip install 'rwkv-statetrace-agent[demo]'` from a package."
+        )
 
 
 def _task_payload(task: AgentTask, trace_path: Path, report_paths: list[Path]) -> dict[str, Any]:
@@ -72,15 +95,16 @@ def _run_task(*, backend: Any, workspace: Path, goal: str, max_steps: int) -> Ag
 
 
 def cmd_demo(args: argparse.Namespace) -> int:
-    data = importlib.resources.files("statetrace").joinpath("demo_data")
-    demo_root = _state_root() / "demo-workspace"
+    _require_demo_dependencies()
+    data = resources.files("statetrace").joinpath("demo_data")
+    demo_parent = _state_root() / "demo-workspaces"
+    demo_parent.mkdir(parents=True, exist_ok=True)
+    demo_root = Path(tempfile.mkdtemp(prefix="demo-", dir=demo_parent))
     fixture_resource = data.joinpath("fixture")
-    with importlib.resources.as_file(fixture_resource) as fixture_source:
-        if demo_root.exists():
-            shutil.rmtree(demo_root)
-        shutil.copytree(fixture_source, demo_root)
+    with resources.as_file(fixture_resource) as fixture_source:
+        shutil.copytree(fixture_source, demo_root, dirs_exist_ok=True)
     replay_resource = data.joinpath("replay_demo.json")
-    with importlib.resources.as_file(replay_resource) as replay_path:
+    with resources.as_file(replay_resource) as replay_path:
         backend = ReplayBackend.from_file(replay_path)
     task = _run_task(
         backend=backend,
@@ -158,19 +182,19 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--max-steps", type=int, default=12)
     run.set_defaults(func=cmd_run)
     status = sub.add_parser("status", help="show a persisted task summary")
-    status.add_argument("--task-id", required=True)
+    status.add_argument("--task-id", required=True, type=_task_id)
     status.set_defaults(func=cmd_status)
     export = sub.add_parser("export", help="locate an exported report")
-    export.add_argument("--task-id", required=True)
+    export.add_argument("--task-id", required=True, type=_task_id)
     export.add_argument("--format", choices=["html", "markdown"], default="html")
     export.set_defaults(func=cmd_export)
     fork = sub.add_parser("fork", help="clone a task checkpoint")
-    fork.add_argument("--task-id", required=True)
-    fork.add_argument("--new-task-id", required=True)
+    fork.add_argument("--task-id", required=True, type=_task_id)
+    fork.add_argument("--new-task-id", required=True, type=_task_id)
     fork.add_argument("--from-step", type=int)
     fork.set_defaults(func=cmd_fork)
     resume = sub.add_parser("resume", help="resume or inspect a stopped task")
-    resume.add_argument("--task-id", required=True)
+    resume.add_argument("--task-id", required=True, type=_task_id)
     resume.set_defaults(func=cmd_resume)
     return parser
 

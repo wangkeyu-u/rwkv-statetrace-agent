@@ -20,6 +20,30 @@ class SamplingConfig:
     max_new_tokens: int = 256
     seed: int | None = 42
 
+    def __post_init__(self) -> None:
+        if (
+            isinstance(self.temperature, bool)
+            or not isinstance(self.temperature, (int, float))
+            or not 0 <= self.temperature <= 2
+        ):
+            raise ValueError("temperature must be between 0 and 2")
+        if (
+            isinstance(self.top_p, bool)
+            or not isinstance(self.top_p, (int, float))
+            or not 0 < self.top_p <= 1
+        ):
+            raise ValueError("top_p must be greater than 0 and at most 1")
+        if (
+            isinstance(self.max_new_tokens, bool)
+            or not isinstance(self.max_new_tokens, int)
+            or self.max_new_tokens < 1
+        ):
+            raise ValueError("max_new_tokens must be a positive integer")
+        if self.seed is not None and (
+            isinstance(self.seed, bool) or not isinstance(self.seed, int)
+        ):
+            raise ValueError("seed must be an integer or None")
+
 
 @dataclass(slots=True)
 class GenerationResult:

@@ -70,7 +70,6 @@ class AgentController:
         self.checkpoints = checkpoint_manager
         self.config = config or ControllerConfig()
         self.prompt_builder = prompt_builder
-        self._fingerprints: dict[str, int] = {}
 
     def new_task(self, goal: str, workspace: str | Path, task_id: str | None = None) -> AgentTask:
         root = Path(workspace).expanduser().resolve()
@@ -147,14 +146,6 @@ class AgentController:
             task.steps.append(step)
             if observation and observation.evidence_id:
                 task.evidence[observation.evidence_id] = observation
-            if isinstance(action, ToolCall) and action.tool != "__protocol__":
-                fingerprint = json.dumps(
-                    {"tool": action.tool, "arguments": action.arguments},
-                    sort_keys=True,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                )
-                self._fingerprints[fingerprint] = self._fingerprints.get(fingerprint, 0) + 1
             if isinstance(action, FinalAction) and observation is None:
                 task.final_report = action.report
         self._record(
@@ -271,8 +262,19 @@ class AgentController:
             ensure_ascii=False,
             separators=(",", ":"),
         )
-        count = self._fingerprints.get(fingerprint, 0) + 1
-        self._fingerprints[fingerprint] = count
+        count = 1 + sum(
+            1
+            for step in task.steps
+            if isinstance(step.action, ToolCall)
+            and step.action.tool != "__protocol__"
+            and json.dumps(
+                {"tool": step.action.tool, "arguments": step.action.arguments},
+                sort_keys=True,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            == fingerprint
+        )
         if count > self.config.max_duplicate_calls:
             return Observation(
                 status="error",

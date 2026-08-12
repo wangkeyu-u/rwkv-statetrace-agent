@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
@@ -213,7 +214,11 @@ class ReportValidator:
 
         verification = report.get("verification")
         tests_run = verification.get("tests_run") if isinstance(verification, Mapping) else None
-        test_evidence = [test_item for test_item in evidence_by_id.values() if test_item.get("tool") == "run_tests"]
+        test_evidence = [
+            test_item
+            for test_item in evidence_by_id.values()
+            if test_item.get("tool") == "run_tests" and test_item.get("status") == "success"
+        ]
         if self.require_test_evidence:
             if not isinstance(tests_run, Sequence) or isinstance(tests_run, (str, bytes)) or not tests_run:
                 errors.append(ValidationError("MISSING_TEST_VERIFICATION", "Report must list tests that were run."))
@@ -233,8 +238,67 @@ class ReportValidator:
                                 f"Report claims test command {command!r}, but no matching evidence exists.",
                             )
                         )
+                claimed_result = verification.get("result") if isinstance(verification, Mapping) else None
+                if isinstance(claimed_result, str) and claimed_result.strip():
+                    claimed_commands = {str(command) for command in tests_run}
+                    matching = [
+                        test_item
+                        for test_item in test_evidence
+                        if isinstance(test_item.get("arguments"), Mapping)
+                        and str(test_item["arguments"].get("command")) in claimed_commands
+                    ]
+                    if matching and not any(_test_result_matches(claimed_result, item) for item in matching):
+                        errors.append(
+                            ValidationError(
+                                "TEST_RESULT_MISMATCH",
+                                "Reported test result does not match the recorded stdout, stderr, or exit code.",
+                            )
+                        )
         return ValidationResult(errors)
 
 
 # Concise compatibility alias for callers that prefer ``Validator``.
 Validator = ReportValidator
+
+
+_PYTEST_COUNT = re.compile(
+    r"(?P<count>\d+)\s+(?P<label>passed|failed|errors?|skipped|xfailed|xpassed|warnings?)\b",
+    re.IGNORECASE,
+)
+
+
+def _test_result_matches(claim: str, evidence: Mapping[str, Any]) -> bool:
+    """Compare a reported summary with captured output and exit status."""
+
+    data = evidence.get("data")
+    if not isinstance(data, Mapping):
+        return False
+    captured = f"{data.get('stdout', '')}\n{data.get('stderr', '')}"
+    actual_counts = {
+        match.group("label").lower(): int(match.group("count"))
+        for match in _PYTEST_COUNT.finditer(captured)
+    }
+    claimed_counts = {
+        match.group("label").lower(): int(match.group("count"))
+        for match in _PYTEST_COUNT.finditer(claim)
+    }
+    if claimed_counts:
+        return all(actual_counts.get(label) == count for label, count in claimed_counts.items())
+
+    exit_code = data.get("exit_code")
+    if not isinstance(exit_code, int) or isinstance(exit_code, bool):
+        return False
+    normalized = claim.casefold()
+    claims_success = any(
+        phrase in normalized
+        for phrase in ("all passed", "tests passed", "test passed", "successful", "success")
+    )
+    claims_failure = any(
+        phrase in normalized for phrase in ("tests failed", "test failed", "failing", "failure")
+    )
+    if claims_success:
+        return exit_code == 0
+    if claims_failure:
+        return exit_code != 0
+    # Neutral notes without a deterministic count/status claim remain valid.
+    return True
