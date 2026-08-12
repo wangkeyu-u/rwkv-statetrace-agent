@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install project and test tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+          python -m pip install -e '.[dev]'
+
+      - name: Lint and type-check source
+        run: |
+          ruff check src tests
+          mypy src/statetrace
+
+      - name: Syntax check
+        run: python -m compileall -q src examples/fixture_repo/src
+
+      - name: Unit and integration tests
+        run: python -m pytest -q tests
+
+      - name: Confirm the teaching fixture still exposes its intentional bug
+        shell: bash
+        run: |
+          set +e
+          fixture_output=$(cd examples/fixture_repo && python -m pytest -q 2>&1)
+          fixture_status=$?
+          set -e
+          echo "$fixture_output"
+          if [ "$fixture_status" -ne 1 ]; then
+            echo "Expected the fixture test suite to report ordinary test failures (exit 1)."
+            exit 1
+          fi
+          if [[ "$fixture_output" != *"3 failed, 1 passed"* ]]; then
+            echo "Expected exactly the documented 3 failing and 1 passing fixture tests."
+            exit 1
+          fi
+
+      - name: Build source and wheel distributions
+        run: python -m build

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "tasks": [
+    {
+      "id": "diagnose-date-boundary",
+      "workspace": "examples/fixture_repo",
+      "goal": "Run the tests, diagnose the date-boundary failures, cite the relevant source and test lines, and recommend a minimal fix without modifying files.",
+      "constraints": {
+        "max_steps": 12,
+        "network": false,
+        "write_files": false
+      },
+      "expected": {
+        "test_command": "python -m pytest -q",
+        "failing_cases": [
+          "test_advances_from_month_end",
+          "test_advances_from_year_end",
+          "test_handles_leap_day"
+        ],
+        "relevant_file": "src/calendar_edge/dates.py",
+        "minimum_distinct_tools": 3
+      }
+    }
+  ]
+}

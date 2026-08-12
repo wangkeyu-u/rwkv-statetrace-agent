@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# StateTrace runtime artifacts
+.statetrace/
+checkpoints/
+traces/*.jsonl
+traces/*.html
+
+# Model files are intentionally not versioned
+models/
+*.pth
+*.pt
+*.bin
+*.safetensors
+*.gguf
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp

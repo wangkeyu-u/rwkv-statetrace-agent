@@ -1,0 +1,9 @@
+{
+  "responses": [
+    {"type":"tool_call","thought_summary":"Inspect layout.","tool":"list_files","arguments":{"path":".","max_depth":3}},
+    {"type":"tool_call","thought_summary":"Capture concrete failures.","tool":"run_tests","arguments":{"command":"python -m pytest -q","timeout_seconds":30}},
+    {"type":"tool_call","thought_summary":"Read the implementation.","tool":"read_file","arguments":{"path":"src/calendar_edge/dates.py","start_line":1,"end_line":100}},
+    {"type":"tool_call","thought_summary":"Read expected behavior.","tool":"read_file","arguments":{"path":"tests/test_dates.py","start_line":1,"end_line":100}},
+    {"type":"final","tool":"finish_report","arguments":{"summary":"The helper resets day to 1 without advancing month or year, breaking calendar boundaries.","findings":[{"file":"src/calendar_edge/dates.py","line":14,"claim":"The month-end branch preserves the original month and year instead of advancing one calendar day.","evidence_ids":["obs-003"]}],"verification":{"tests_run":["python -m pytest -q"],"result":"1 passed, 3 failed","evidence_ids":["obs-002"]},"recommendations":["Use value + timedelta(days=1), then rerun the tests."],"uncertainties":["The demo diagnoses but intentionally does not modify the fixture."]}}
+  ]
+}

@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rwkv-statetrace-agent"
+version = "0.1.0"
+description = "An evidence-backed RWKV agent with auditable tools and recurrent-state checkpoints"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "RWKV StateTrace contributors" }]
+keywords = ["rwkv", "rwkv7", "ai-agent", "tool-use", "local-ai"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+]
+dependencies = []
+
+[project.optional-dependencies]
+demo = ["pytest>=8"]
+dev = ["mypy>=1.10", "pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+statetrace = "statetrace.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+statetrace = ["demo_data/**/*.json", "demo_data/**/*.toml", "demo_data/**/*.py"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["statetrace"]
+exclude = ["^src/statetrace/demo_data/"]
+strict = true
+warn_unused_ignores = true
