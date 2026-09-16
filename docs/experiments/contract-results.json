@@ -1,0 +1,222 @@
+{
+  "created_at": "2026-09-16T14:37:24.252281+00:00",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "python": "3.13.13",
+  "base_commit": "02d34e5a69b83b623a068fd3bc2bfa0f19ae4e60",
+  "scope": "Replay and fake-adapter controller contracts; live API and native runtime NOT RUN",
+  "experiments": [
+    {
+      "name": "state-resume",
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_controller.py",
+        "tests/test_checkpoints.py"
+      ],
+      "exit_code": 0,
+      "cases": [
+        {
+          "name": "test_checkpoint_restores_history_and_resumes_without_repeating_tools",
+          "class": "tests.test_controller.ControllerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_duplicate_tool_call_is_blocked_after_limit",
+          "class": "tests.test_controller.ControllerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_duplicate_tracking_is_task_scoped_when_controller_is_reused",
+          "class": "tests.test_controller.ControllerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_protocol_error_is_observed_and_next_response_can_recover",
+          "class": "tests.test_controller.ControllerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_recurrent_state_uses_incremental_observation_after_first_turn",
+          "class": "tests.test_controller.ControllerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_strict_loop_collects_evidence_then_finishes",
+          "class": "tests.test_controller.ControllerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_validator_rejection_returns_to_model",
+          "class": "tests.test_controller.ControllerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_backend_or_model_mismatch_fails_closed",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_clone_is_independent_and_updates_identity",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_clone_refuses_to_bless_a_corrupted_source",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_corrupted_state_fails_checksum",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_rejects_unsafe_task_id",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_save_and_load_latest_checkpoint",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_tampered_task_state_and_trace_fail_integrity",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_task_only_checkpoint_and_missing_task",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_unexpected_checkpoint_artifact_fails_integrity",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "fork-behavior",
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_checkpoints.py",
+        "-k",
+        "clone"
+      ],
+      "exit_code": 0,
+      "cases": [
+        {
+          "name": "test_clone_is_independent_and_updates_identity",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_clone_refuses_to_bless_a_corrupted_source",
+          "class": "tests.test_checkpoints.CheckpointManagerTests",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "evidence-validation",
+      "command": [
+        "python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_validator.py",
+        "tests/test_protocol.py"
+      ],
+      "exit_code": 0,
+      "cases": [
+        {
+          "name": "test_accepts_final_report_model",
+          "class": "tests.test_validator.ValidatorTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_evidence_from_real_agent_steps",
+          "class": "tests.test_validator.ValidatorTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_ignores_failed_tool_attempt_as_test_evidence",
+          "class": "tests.test_validator.ValidatorTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_rejects_evidence_for_a_different_file",
+          "class": "tests.test_validator.ValidatorTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_rejects_line_past_end_and_path_escape",
+          "class": "tests.test_validator.ValidatorTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_rejects_missing_file_invalid_line_and_unknown_evidence",
+          "class": "tests.test_validator.ValidatorTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_rejects_success_claim_when_test_exit_code_failed",
+          "class": "tests.test_validator.ValidatorTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_rejects_test_counts_that_contradict_captured_output",
+          "class": "tests.test_validator.ValidatorTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_rejects_unverified_test_claim",
+          "class": "tests.test_validator.ValidatorTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_valid_report_passes",
+          "class": "tests.test_validator.ValidatorTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_invalid_json_becomes_safe_feedback",
+          "class": "tests.test_protocol.ProtocolTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_parses_fenced_tool_action",
+          "class": "tests.test_protocol.ProtocolTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_parses_final_report_to_json_lists",
+          "class": "tests.test_protocol.ProtocolTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_rejects_multiple_actions_but_allows_prose_wrapper",
+          "class": "tests.test_protocol.ProtocolTests",
+          "status": "passed"
+        },
+        {
+          "name": "test_rejects_wrong_argument_shape_and_finish_type",
+          "class": "tests.test_protocol.ProtocolTests",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "intentional_fixture": {
+    "exit_code": 1,
+    "expected_failure_observed": true,
+    "output": ".FFF                                                                     [100%]\n=================================== FAILURES ===================================\n_________________________ test_advances_from_month_end _________________________\n\n    def test_advances_from_month_end() -> None:\n>       assert next_calendar_day(date(2026, 8, 31)) == date(2026, 9, 1)\nE       assert datetime.date(2026, 8, 1) == datetime.date(2026, 9, 1)\nE        +  where datetime.date(2026, 8, 1) = next_calendar_day(datetime.date(2026, 8, 31))\nE        +    where datetime.date(2026, 8, 31) = date(2026, 8, 31)\nE        +  and   datetime.date(2026, 9, 1) = date(2026, 9, 1)\n\ntests/test_dates.py:11: AssertionError\n_________________________ test_advances_from_year_end __________________________\n\n    def test_advances_from_year_end() -> None:\n>       assert next_calendar_day(date(2026, 12, 31)) == date(2027, 1, 1)\nE       assert datetime.date(2026, 12, 1) == datetime.date(2027, 1, 1)\nE        +  where datetime.date(2026, 12, 1) = next_calendar_day(datetime.date(2026, 12, 31))\nE        +    where datetime.date(2026, 12, 31) = date(2026, 12, 31)\nE        +  and   datetime.date(2027, 1, 1) = date(2027, 1, 1)\n\ntests/test_dates.py:15: AssertionError\n____________________________ test_handles_leap_day _____________________________\n\n    def test_handles_leap_day() -> None:\n>       assert next_calendar_day(date(2024, 2, 29)) == date(2024, 3, 1)\nE       assert datetime.date(2024, 2, 1) == datetime.date(2024, 3, 1)\nE        +  where datetime.date(2024, 2, 1) = next_calendar_day(datetime.date(2024, 2, 29))\nE        +    where datetime.date(2024, 2, 29) = date(2024, 2, 29)\nE        +  and   datetime.date(2024, 3, 1) = date(2024, 3, 1)\n\ntests/test_dates.py:19: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_dates.py::test_advances_from_month_end - assert datetime.da...\nFAILED tests/test_dates.py::test_advances_from_year_end - assert datetime.dat...\nFAILED tests/test_dates.py::test_handles_leap_day - assert datetime.date(2024...\n3 failed, 1 passed in 0.01s\n"
+  }
+}
