@@ -1,21 +1,11 @@
-# AI-assisted Development
+# AI-assisted development
 
-AI coding tools were used during implementation. The earlier [AI usage record](ai-usage.md) remains the historical disclosure.
+The [earlier AI usage record](ai-usage.md) describes the project's original assistance boundaries. Codex assisted this revision's contract runner, execution and documentation.
 
-## Assistance in this revision
+## Evidence from this revision
 
-The September 2026 evidence audit used Codex for code inspection, implementation drafts, test execution, failure investigation, refactoring suggestions and documentation drafts. Newly authored experiment fixtures are labeled synthetic. Test outputs and committed experiment records are the evidence; generated prose is not evidence by itself.
+- The runner executes existing recovery, fork and evidence-validation tests and records named cases in [contract-results.json](experiments/contract-results.json).
+- Replay and fake backends exercise controller behavior. They do not validate real native RWKV tensors or establish an inference speedup.
+- The intentional teaching fixture still fails with three failures and one pass. The agent diagnoses that fixture; it does not silently repair it to make the demonstration pass.
 
-## Technical ownership and acceptance
-
-The developer owns problem definition, architecture choices, experiment acceptance criteria, evaluation methodology, failure interpretation, security review and final implementation decisions. This describes responsibility, not a claim that all historical code or experiments were manually authored. This AI-assisted revision remains subject to the developer's final technical review; running tests does not substitute for that review.
-
-Generated changes are evaluated using the linked tests, reproducible experiments and failure cases. The audit did not fine-tune a model, invent production deployment, rewrite old commits or remove failure results. Missing model/data resources and unverified capabilities are identified in the experiment records.
-
-## Inspectable evidence
-
-- [Engineering decisions](decisions/)
-- [Failures](failures/)
-- [Experiments](experiments/)
-
-Validation methods used in this revision are recorded with commands and scope. Model quality, contract tests and mock workflow checks must not be conflated.
+The developer owns acceptance of the action protocol, persistence semantics and execution boundary. Live API inference and native runtime behavior remain unmeasured in this revision.
