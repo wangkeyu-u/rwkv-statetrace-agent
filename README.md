@@ -1,10 +1,37 @@
 # RWKV StateTrace Agent
 
-**A traceable code-diagnosis agent whose model chooses each tool call, receives the observation, and decides what to do next. A native RWKV adapter can checkpoint, restore and fork recurrent working state.**
+A code-diagnosis runtime with auditable tool observations, checked reports and verified task checkpoints. Native RWKV integration is an adapter contract; it has not been measured with a real native runtime in this audit.
 
 > Project status: an engineering demonstration, not a production security sandbox. The bundled Replay demo is deterministic recorded behavior—not live model inference. A standard text API is live inference but does not expose native RWKV recurrent state. Only a compatible Direct adapter may claim native state checkpointing.
 
 ## What it demonstrates
+
+The engineering problem is preserving exact evidence and recoverable task state when an agent emits invalid actions, repeats work or proposes an unsupported final report.
+
+## Engineering decisions
+
+- [Keep state semantics explicit](docs/decisions/001-state-boundaries.md): Replay stores a cursor, API mode stores task/trace, and only a compatible native adapter can serialize recurrent tensors.
+- [Validate all checkpoint artifacts](docs/decisions/002-artifact-integrity.md): hashing just the model blob would leave task metadata and evidence open to undetected corruption.
+- [Validate evidence before completion](docs/decisions/003-deterministic-evidence.md): return rejected claims as observations so a controller can continue rather than silently accepting them.
+
+## Baseline, failure cases and experiments
+
+The comparison baseline is accepting a structured report without checking evidence, or saving only a backend blob. These are design alternatives, not measured historical model baselines. Existing regression cases inject unknown evidence, contradictory test counts, corrupt metadata and malformed actions; the audit executes them through the current implementation.
+
+| Experiment | Observed result | What it establishes |
+|---|---|---|
+| [State resume](docs/experiments/state-resume.md) | 16/16 contract cases passed | Task/history restoration, Replay continuation and fake-backend integrity checks |
+| [Fork behavior](docs/experiments/fork-behavior.md) | 2/2 clone cases passed | Independent artifacts; corrupt source rejection |
+| [Evidence validation](docs/experiments/evidence-validation.md) | 15/15 cases passed | Protocol and evidence rejection behavior |
+| Intentional teaching fixture | 3 failed, 1 passed, exit 1 | The diagnosed defect remains reproducible |
+
+Run `uv sync --extra dev && uv run python scripts/run_contract_experiments.py`. [Raw results](docs/experiments/contract-results.json) contain named cases and environment. Groups overlap; do not sum them as distinct tests. Live API inference, native recurrent state, quality and speedup were **not run**. The [corruption failure log](docs/failures/001-corrupted-checkpoint.md) explains the guard being tested.
+
+## Ablation and trade-offs
+
+No neural memory or component-performance ablation has been measured. Replay and fake adapters isolate controller contracts only. Exact evidence adds storage; retained checkpoint history grows with snapshot count. Hashes detect corruption but do not authenticate an attacker-writable manifest. Deterministic evidence checks do not prove the semantics of every diagnosis.
+
+## System
 
 StateTrace accepts a goal such as:
 
@@ -220,7 +247,7 @@ Saving many fixed-size neural states still uses storage proportional to the numb
 - [DPLR explained](docs/dplr-explained.md): diagonal decay, low-rank correction and affine composition.
 - [Agent loop](docs/agent-loop.md): autonomy/control boundary, recovery and evidence.
 - [Limitations](docs/limitations.md): model, security, performance and compatibility limits.
-- [AI usage](docs/ai-usage.md): what AI assisted and how outputs were checked.
+- [AI-assisted development](docs/AI_ASSISTED_DEVELOPMENT.md): current audit and technical ownership, linking the retained [earlier AI usage record](docs/ai-usage.md).
 
 Primary references supplied with the assignment:
 
