@@ -1,5 +1,7 @@
 # AI-assisted development
 
+The project owner, Wang Keyu, set the original agent runtime architecture and core framework. The [first commit](https://github.com/wangkeyu-u/rwkv-statetrace-agent/commit/30e6ef2786) contains the backend interfaces, state-trace modules and baseline documentation. Later AI assistance and the direct-runtime validation boundary are described below.
+
 The [earlier AI usage record](ai-usage.md) describes the project's original assistance boundaries. Codex assisted this revision's contract runner, execution and documentation.
 
 ## Evidence from this revision
