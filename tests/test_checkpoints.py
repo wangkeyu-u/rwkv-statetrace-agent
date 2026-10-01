@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import shutil
+import subprocess
+import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from statetrace.checkpoints import (
     CheckpointCorrupted,
@@ -72,6 +78,112 @@ class CheckpointManagerTests(unittest.TestCase):
         (metadata.path / "model_state.bin").write_bytes(b"tampered")
         with self.assertRaises(CheckpointCorrupted):
             self.manager.load(task_id="task-corrupt", backend=self.backend)
+
+    def test_failed_overwrite_publish_preserves_original_artifacts(self):
+        trace = self.root / "trace.jsonl"
+        trace.write_text('{"event":"original"}\n', encoding="utf-8")
+        metadata = self.manager.save(
+            task_id="task-publish", step=1, task_state={"goal": "original"},
+            model_state={"cursor": 1}, backend=self.backend, trace_path=trace,
+        )
+        original = {path.name: path.read_bytes() for path in metadata.path.iterdir()}
+        real_replace = os.replace
+
+        def fail_publish(source, destination):
+            if Path(source).name.startswith(".step_0001-"):
+                raise OSError("injected publish failure")
+            return real_replace(source, destination)
+
+        with (
+            patch("statetrace.checkpoints.os.replace", side_effect=fail_publish),
+            self.assertRaisesRegex(OSError, "injected publish failure"),
+        ):
+            self.manager.save(
+                task_id="task-publish", step=1, task_state={"goal": "replacement"},
+                model_state={"cursor": 2}, backend=self.backend,
+            )
+
+        loaded = self.manager.load(task_id="task-publish", backend=self.backend)
+        self.assertEqual(loaded.task_state["goal"], "original")
+        self.assertEqual(loaded.model_state, {"cursor": 1})
+        self.assertEqual(original, {path.name: path.read_bytes() for path in metadata.path.iterdir()})
+        self.assertEqual(list(metadata.path.parent.iterdir()), [metadata.path])
+
+    def test_interrupted_overwrite_recovers_previous_checkpoint(self):
+        metadata = self.manager.save(
+            task_id="task-interrupted", step=1, task_state={"goal": "original"},
+            backend=None,
+        )
+        code = textwrap.dedent("""
+            import os
+            import sys
+            from pathlib import Path
+            from unittest.mock import patch
+            from statetrace.checkpoints import CheckpointManager
+            real_replace = os.replace
+            def interrupt_publish(source, destination):
+                if Path(source).name.startswith('.step_0001-'):
+                    os._exit(91)
+                return real_replace(source, destination)
+            with patch('statetrace.checkpoints.os.replace', side_effect=interrupt_publish):
+                CheckpointManager(sys.argv[1]).save(
+                    task_id='task-interrupted', step=1, task_state={'goal': 'replacement'})
+        """)
+        result = subprocess.run([sys.executable, "-c", code, str(self.manager.root)], check=False)
+        self.assertEqual(result.returncode, 91)
+
+        recovered = CheckpointManager(self.manager.root)
+        self.assertEqual(recovered.list_steps("task-interrupted"), [1])
+        loaded = recovered.load(task_id="task-interrupted", backend=None)
+        self.assertEqual(loaded.task_state["goal"], "original")
+        self.assertIsNone(loaded.model_state)
+        self.assertTrue(metadata.path.is_dir())
+
+    def test_interrupted_backup_cleanup_keeps_published_replacement(self):
+        self.manager.save(
+            task_id="task-cleanup", step=1, task_state={"goal": "original"},
+            model_state={"cursor": 1}, backend=self.backend,
+        )
+        real_rmtree = shutil.rmtree
+
+        def interrupt_cleanup(path, *args, **kwargs):
+            if Path(path).name.endswith(".backup"):
+                raise KeyboardInterrupt("injected interruption after publish")
+            return real_rmtree(path, *args, **kwargs)
+
+        with (
+            patch("statetrace.checkpoints.shutil.rmtree", side_effect=interrupt_cleanup),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            self.manager.save(
+                task_id="task-cleanup", step=1, task_state={"goal": "replacement"},
+                model_state={"cursor": 2}, backend=self.backend,
+            )
+
+        recovered = CheckpointManager(self.manager.root)
+        loaded = recovered.load(task_id="task-cleanup", step=1, backend=self.backend)
+        self.assertEqual(loaded.task_state["goal"], "replacement")
+        self.assertEqual(loaded.model_state, {"cursor": 2})
+        self.assertEqual(list(loaded.metadata.path.parent.iterdir()), [loaded.metadata.path])
+
+    def test_recovery_does_not_hide_a_corrupted_published_checkpoint(self):
+        self.manager.save(
+            task_id="task-recovery-corrupt", step=0, task_state={"goal": "older"},
+            model_state={"cursor": 0}, backend=self.backend,
+        )
+        metadata = self.manager.save(
+            task_id="task-recovery-corrupt", step=1, task_state={"goal": "original"},
+            model_state={"cursor": 1}, backend=self.backend,
+        )
+        backup = metadata.path.with_name(f".{metadata.path.name}.backup")
+        shutil.copytree(metadata.path, backup)
+        (metadata.path / "task_state.json").write_text('{"goal":"forged"}\n', encoding="utf-8")
+
+        older = self.manager.load(task_id="task-recovery-corrupt", step=0, backend=self.backend)
+        self.assertEqual(older.task_state["goal"], "older")
+        with self.assertRaises(CheckpointCorrupted):
+            self.manager.load(task_id="task-recovery-corrupt", backend=self.backend)
+        self.assertTrue(backup.is_dir())
 
     def test_tampered_task_state_and_trace_fail_integrity(self):
         trace = self.root / "trace.jsonl"
