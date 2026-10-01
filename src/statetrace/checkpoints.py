@@ -1,4 +1,4 @@
-"""Crash-resistant task and model-state checkpoints."""
+"""Verified task checkpoints with recoverable directory replacement."""
 
 from __future__ import annotations
 
@@ -149,6 +149,46 @@ class CheckpointManager:
             raise ValueError("step must be a non-negative integer")
         return self.root / task_id / f"step_{step:04d}"
 
+    def _recover_task(self, task_id: str, step: int | None = None) -> None:
+        """Reconcile a single writer's interrupted directory replacement."""
+
+        task_dir = self.root / _validate_id(task_id, "task_id")
+        if not task_dir.exists():
+            return
+        for backup in sorted(task_dir.iterdir()):
+            match = re.fullmatch(r"\.(step_\d{4,})\.backup", backup.name)
+            if not match:
+                continue
+            if step is not None and int(match.group(1).removeprefix("step_")) != step:
+                continue
+            if backup.is_symlink() or not backup.is_dir():
+                raise CheckpointCorrupted(f"Invalid checkpoint recovery directory: {backup.name}")
+            destination = task_dir / match.group(1)
+            if destination.exists():
+                # Publication finished; only remove the previous generation
+                # after verifying the selected replacement, without re-hashing it.
+                _verify_integrity_manifest(destination)
+                shutil.rmtree(backup)
+            else:
+                # Publication did not finish. Restore the original bytes.
+                os.replace(backup, destination)
+
+    @staticmethod
+    def _publish(temp: Path, destination: Path, *, overwrite: bool) -> None:
+        if not destination.exists():
+            os.replace(temp, destination)
+            return
+        if not overwrite:
+            raise FileExistsError(destination)
+        backup = destination.with_name(f".{destination.name}.backup")
+        os.replace(destination, backup)
+        try:
+            os.replace(temp, destination)
+        except Exception:
+            os.replace(backup, destination)
+            raise
+        shutil.rmtree(backup)
+
     def save(
         self,
         *,
@@ -161,6 +201,7 @@ class CheckpointManager:
         overwrite: bool = True,
     ) -> CheckpointMetadata:
         destination = self.checkpoint_path(task_id, step)
+        self._recover_task(task_id, step)
         destination.parent.mkdir(parents=True, exist_ok=True)
         temp = Path(tempfile.mkdtemp(prefix=f".{destination.name}-", dir=destination.parent))
         created_at = utc_now()
@@ -217,11 +258,7 @@ class CheckpointManager:
 
             _write_integrity_manifest(temp)
 
-            if destination.exists():
-                if not overwrite:
-                    raise FileExistsError(destination)
-                shutil.rmtree(destination)
-            os.replace(temp, destination)
+            self._publish(temp, destination, overwrite=overwrite)
         except Exception:
             shutil.rmtree(temp, ignore_errors=True)
             raise
@@ -238,7 +275,7 @@ class CheckpointManager:
         )
 
     def list_steps(self, task_id: str) -> list[int]:
-        _validate_id(task_id, "task_id")
+        self._recover_task(task_id)
         task_dir = self.root / task_id
         if not task_dir.exists():
             return []
@@ -256,6 +293,7 @@ class CheckpointManager:
         return steps[-1]
 
     def load(self, *, task_id: str, backend: Any, step: int | None = None) -> LoadedCheckpoint:
+        self._recover_task(task_id, step)
         selected_step = self.latest_step(task_id) if step is None else step
         path = self.checkpoint_path(task_id, selected_step)
         if not path.is_dir():
@@ -333,7 +371,9 @@ class CheckpointManager:
         """Fork a checkpoint without mutating the source task."""
 
         _validate_id(new_task_id, "new_task_id")
+        self._recover_task(source_task_id, step)
         selected_step = self.latest_step(source_task_id) if step is None else step
+        self._recover_task(new_task_id, selected_step)
         source = self.checkpoint_path(source_task_id, selected_step)
         if not source.is_dir():
             raise CheckpointNotFound(f"Checkpoint does not exist: {source}")

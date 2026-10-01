@@ -27,6 +27,8 @@ The comparison baseline is accepting a structured report without checking eviden
 
 Run `uv sync --extra dev && uv run python scripts/run_contract_experiments.py`. [Raw results](docs/experiments/contract-results.json) contain named cases and environment. Groups overlap; do not sum them as distinct tests. Live API inference, native recurrent state, quality and speedup were **not run**. The [corruption failure log](docs/failures/001-corrupted-checkpoint.md) explains the guard being tested.
 
+[Checkpoint overwrite recovery](docs/failures/002-checkpoint-overwrite.md) adds publication-error and process-interruption regressions: a failed replacement preserves the previously saved state, and restart selects a fully published replacement only after integrity verification.
+
 ## Ablation and trade-offs
 
 No neural memory or component-performance ablation has been measured. Replay and fake adapters isolate controller contracts only. Exact evidence adds storage; retained checkpoint history grows with snapshot count. Hashes detect corruption but do not authenticate an attacker-writable manifest. Deterministic evidence checks do not prove the semantics of every diagnosis.

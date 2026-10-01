@@ -147,6 +147,8 @@ statetrace fork --task-id <task-id> --from-step 4 --new-task-id alternative-sear
 
 `resume` is intentionally conservative: it reports already completed tasks without repeating actions. A stopped live task requires the original backend configuration, so generic CLI resume currently directs the caller to `CheckpointManager.load` and `AgentController` in Python. `fork` clones checkpoint artifacts; starting a new continuation also requires the corresponding backend/controller integration.
 
+An overwrite stages all new artifacts before renaming the previous checkpoint to a hidden backup. A publication error restores that backup. Listing, loading, saving and cloning reconcile an interrupted replacement: they restore the previous directory when publication did not finish, or verify the published directory before discarding its backup. See the [publication failure and recovery tests](docs/failures/002-checkpoint-overwrite.md). This is a single-writer contract per task; concurrent writers are not coordinated. Process interruption is tested, while sudden power-loss durability is not established. Interrupted staging directories may remain on disk but are not selected as checkpoints.
+
 Saving many fixed-size neural states still uses storage proportional to the number of snapshots. StateTrace never calls the total checkpoint history “constant size.”
 
 ## Repository layout
@@ -169,4 +171,3 @@ Saving many fixed-size neural states still uses storage proportional to the numb
 ├── docs/
 └── .github/workflows/ci.yml
 ```
-
