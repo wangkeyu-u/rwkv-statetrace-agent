@@ -20,9 +20,9 @@ The comparison baseline is accepting a structured report without checking eviden
 
 | Experiment | Observed result | What it establishes |
 |---|---|---|
-| [State resume](docs/experiments/state-resume.md) | 16/16 contract cases passed | Task/history restoration, Replay continuation and fake-backend integrity checks |
-| [Fork behavior](docs/experiments/fork-behavior.md) | 2/2 clone cases passed | Independent artifacts; corrupt source rejection |
-| [Evidence validation](docs/experiments/evidence-validation.md) | 15/15 cases passed | Protocol and evidence rejection behavior |
+| [State resume](docs/experiments/README.md#state-resume) | 16/16 contract cases passed | Task/history restoration, Replay continuation and fake-backend integrity checks |
+| [Fork behavior](docs/experiments/README.md#fork-behavior) | 2/2 clone cases passed | Independent artifacts; corrupt source rejection |
+| [Evidence validation](docs/experiments/README.md#evidence-validation) | 15/15 cases passed | Protocol and evidence rejection behavior |
 | Intentional teaching fixture | 3 failed, 1 passed, exit 1 | The diagnosed defect remains reproducible |
 
 Run `uv sync --extra dev && uv run python scripts/run_contract_experiments.py`. [Raw results](docs/experiments/contract-results.json) contain named cases and environment. Groups overlap; do not sum them as distinct tests. Live API inference, native recurrent state, quality and speedup were **not run**. The [corruption failure log](docs/failures/001-corrupted-checkpoint.md) explains the guard being tested.
@@ -90,7 +90,7 @@ The copied teaching fixture intentionally has three failing tests and one passin
 - [DPLR explained](docs/dplr-explained.md): diagonal decay, low-rank correction and affine composition.
 - [Agent loop](docs/agent-loop.md): autonomy/control boundary, recovery and evidence.
 - [Limitations](docs/limitations.md): model, security, performance and compatibility limits.
-- [AI-assisted development](docs/AI_ASSISTED_DEVELOPMENT.md): current audit and technical ownership, linking the retained [earlier AI usage record](docs/ai-usage.md).
+- [AI assistance and ownership](docs/ai-usage.md): original assistance boundaries and the contract-runner revision.
 
 Implementation references:
 
