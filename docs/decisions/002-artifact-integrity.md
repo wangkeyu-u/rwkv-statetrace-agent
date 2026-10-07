@@ -20,7 +20,7 @@ Validate integrity, identity, backend and model before load/clone.
 Fork must not convert a corrupt source into an apparently clean branch.
 
 ## Validation
-[Fork experiment](../experiments/fork-behavior.md), `tests/test_checkpoints.py` tampering and clone cases.
+[Fork experiment](../experiments/README.md#fork-behavior), `tests/test_checkpoints.py` tampering and clone cases.
 
 ## Trade-offs
 Checksums detect corruption, not malicious rewriting by someone able to recompute the whole manifest; no external authenticity claim.

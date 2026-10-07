@@ -20,7 +20,7 @@ Persist backend-owned state only where supported, alongside exact task/trace met
 A conversation ID and a Replay cursor cannot establish native recurrent-state restoration.
 
 ## Validation
-[State experiment](../experiments/state-resume.md); `tests/test_checkpoints.py` tests fake state, not native tensors.
+[State experiment](../experiments/README.md#state-resume); `tests/test_checkpoints.py` tests fake state, not native tensors.
 
 ## Trade-offs
 Native performance remains unmeasured; the CLI does not instantiate arbitrary direct runtimes.

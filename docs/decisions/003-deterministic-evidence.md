@@ -20,7 +20,7 @@ Return validator rejection as an observation so the loop can recover.
 Protocol validity and factual support are separate requirements.
 
 ## Validation
-[Evidence experiment](../experiments/evidence-validation.md); `src/statetrace/validator.py` and `tests/test_validator.py`.
+[Evidence experiment](../experiments/README.md#evidence-validation); `src/statetrace/validator.py` and `tests/test_validator.py`.
 
 ## Trade-offs
 Trusted test commands still execute code; the tool allowlist is not an OS sandbox.

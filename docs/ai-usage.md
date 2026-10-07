@@ -27,6 +27,8 @@ Generated suggestions are not treated as evidence by themselves. The project che
 
 ## Authorship boundary
 
+The project owner, Wang Keyu, set the original agent runtime architecture and core framework. The [first commit](https://github.com/wangkeyu-u/rwkv-statetrace-agent/commit/30e6ef2786) contains the backend interfaces, state-trace modules and baseline documentation. Later AI assistance and the direct-runtime validation boundary are described below.
+
 The maintainers remain responsible for:
 
 - selecting the project scope and safety boundary;
@@ -49,3 +51,11 @@ No model weights, private prompts, credentials or third-party source files are g
 - [rwkv-mobile](https://github.com/MollySophia/rwkv-mobile)
 - [RWKV.com project index source](https://github.com/BlinkDL/RWKV.com/blob/master/js/index.js)
 - [GitHub RWKV repository search](https://github.com/search?o=desc&p=1&q=rwkv&s=updated&type=Repositories)
+
+## Contract-runner revision
+
+Codex assisted the runner, execution and documentation. The runner records named
+recovery, fork and evidence cases in [contract-results.json](experiments/contract-results.json).
+Replay/fake tests do not establish native inference speedup. The teaching fixture
+retains three failures and one pass; acceptance of the protocol, persistence
+semantics and execution boundary remains the developer's responsibility.
